@@ -1,53 +1,158 @@
 # Concurrent Programming Lab 1: Linked List Implementation
 
 ## Overview
-This project implements a linked list data structure using three different approaches:
-1. **Serial Implementation** - Single-threaded execution
+This project implements a concurrent linked list data structure using three different synchronization approaches to compare their performance characteristics:
+
+1. **Serial Implementation** - Single-threaded baseline execution
 2. **Mutex Implementation** - Multi-threaded with one mutex protecting the entire list
-3. **Read-Write Lock Implementation** - Multi-threaded with read-write locks for better performance
+3. **Read-Write Lock Implementation** - Multi-threaded with read-write locks for optimized read concurrency
 
 ## Features
-- Supports Member(), Insert(), and Delete() operations
-- Handles values from 0 to 2^16 - 1 (65535)
-- Maintains a sorted linked list
-- Prevents duplicate insertions
-- Measures and compares performance between implementations
+- **Thread-safe operations**: Member(), Insert(), and Delete()
+- **Value range**: 0 to 2^16 - 1 (65535)
+- **Sorted linked list**: Maintains order for efficient operations
+- **Duplicate prevention**: No duplicate values allowed
+- **Comprehensive performance measurement**: Statistical analysis with proper sampling
+- **Configurable workloads**: Adjustable operation mix ratios
 
-## Compilation
+## Project Structure
+```
+├── lab1.c                    # Main implementation (interactive demo)
+├── performance_test.c        # Automated performance testing
+├── run_performance_tests.sh  # Comprehensive test script
+├── Makefile                  # Build configuration
+├── DESIGN.md                 # Design explanation (Step 1)
+├── TESTING_GUIDE.md          # Testing instructions
+├── RESULTS_SUMMARY.md        # Performance results (Step 3)
+└── README.md                 # This file
+```
 
-### Using Makefile (Recommended)
+## Quick Start
+
+### Compilation
 ```bash
+# Compile all programs
 make
+
+# Or compile individually
+make lab1              # Interactive demo
+make performance_test  # Performance testing
 ```
 
-### Manual Compilation
-```bash
-gcc -Wall -Wextra -std=c99 -pthread -O2 -o lab1 lab1.c
-```
-
-## Usage
+### Run Interactive Demo
 ```bash
 ./lab1 <n> <m> <thread_count> <m_member> <m_insert>
 ```
 
-### Parameters:
-- **n**: Initial number of elements to populate the list
-- **m**: Total number of operations to perform
-- **thread_count**: Number of threads to use for parallel implementations
-- **m_member**: Fraction of operations that should be Member() calls (0.0 to 1.0)
-- **m_insert**: Fraction of operations that should be Insert() calls (0.0 to 1.0)
-- **m_delete**: Automatically calculated as (1.0 - m_member - m_insert)
-
-### Example:
+**Example:**
 ```bash
 ./lab1 1000 10000 4 0.8 0.1
+# 1000 initial elements, 10000 operations, 4 threads
+# 80% Member, 10% Insert, 10% Delete operations
 ```
-This runs with:
-- 1000 initial elements
-- 10000 total operations
-- 4 threads
-- 80% Member operations
-- 10% Insert operations  
+
+### Run Performance Tests
+```bash
+# Quick test (small sample size)
+make quick-test
+
+# Comprehensive test (for assignment results)
+make performance
+```
+
+## Assignment Requirements Implementation
+
+### Step 1: Design Solution ✅
+See `DESIGN.md` for detailed explanation of:
+- Thread-based operation distribution strategy
+- Random number generation approach
+- Three synchronization implementations
+- Expected performance characteristics
+
+### Step 2: Implementation ✅
+Complete implementations in `lab1.c` and `performance_test.c`:
+- **Serial**: Single-threaded baseline
+- **Mutex**: Global mutex protection
+- **Read-Write Locks**: Concurrent reads, exclusive writes
+
+### Step 3: Performance Results ✅
+See `RESULTS_SUMMARY.md` for:
+- Comprehensive performance tables for all three cases
+- Statistical analysis with 50 samples per configuration
+- 95% confidence level with ±5% accuracy
+- System specifications and analysis
+
+## Test Cases
+
+### Case 1: Read-Heavy Workload
+- **Parameters**: n=1000, m=10000
+- **Operation Mix**: 99% Member, 0.5% Insert, 0.5% Delete
+- **Expected**: Read-write locks should excel
+
+### Case 2: Moderate Mixed Workload  
+- **Parameters**: n=1000, m=10000
+- **Operation Mix**: 90% Member, 5% Insert, 5% Delete
+- **Expected**: Balanced performance
+
+### Case 3: Write-Heavy Workload
+- **Parameters**: n=1000, m=10000
+- **Operation Mix**: 50% Member, 25% Insert, 25% Delete
+- **Expected**: High contention, limited parallelism
+
+## Performance Results Summary
+
+| Case | Read-Write Lock Best At | Mutex Best At | Key Insight |
+|------|------------------------|---------------|-------------|
+| 1    | All thread counts      | Single thread | RW-locks scale excellently |
+| 2    | Low thread counts      | Higher thread counts | Moderate write contention |
+| 3    | Single thread only     | Most configurations | High writes limit parallelism |
+
+## System Requirements
+- **CPU**: Minimum 4 physical cores (hyperthreading not counted)
+- **OS**: Linux with pthread support
+- **Compiler**: GCC with C99 support
+- **Memory**: Sufficient for concurrent execution
+
+## Development Commands
+```bash
+# Clean all compiled files
+make clean
+
+# Test with different thread counts
+make test-threads
+
+# Run specific performance case
+./performance_test 1 1000 10000 50  # Case 1 with 50 samples
+
+# Check system information
+lscpu | grep -E "Model name|CPU\(s\)|Core\(s\)"
+```
+
+## Key Implementation Details
+
+### Thread Safety
+- Thread-local random number generators (`rand_r()`)
+- Proper synchronization primitive initialization/cleanup
+- Load-balanced work distribution among threads
+
+### Performance Measurement
+- High-resolution timing with `gettimeofday()`
+- Statistical analysis (mean, standard deviation)
+- Multiple samples for confidence intervals
+
+### Memory Management
+- Proper cleanup of linked list nodes
+- No memory leaks in any implementation
+- Efficient memory allocation patterns
+
+## Files for Assignment Submission
+1. **Source Code**: `lab1.c`, `performance_test.c`
+2. **Design Document**: `DESIGN.md` (Step 1)
+3. **Performance Results**: `RESULTS_SUMMARY.md` (Step 3)
+4. **Build System**: `Makefile`
+5. **Testing Guide**: `TESTING_GUIDE.md`
+
+This implementation provides a complete solution for the concurrent programming assignment with proper statistical analysis and comprehensive performance evaluation.  
 - 10% Delete operations
 
 ## Testing

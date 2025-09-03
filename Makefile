@@ -2,17 +2,40 @@ CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -pthread -O2
 TARGET = lab1
 SOURCE = lab1.c
+PERF_TARGET = performance_test
+PERF_SOURCE = performance_test.c
 
 # Default target
-all: $(TARGET)
+all: $(TARGET) $(PERF_TARGET)
 
 # Compile the program
 $(TARGET): $(SOURCE)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE)
 
+# Compile the performance test program
+$(PERF_TARGET): $(PERF_SOURCE)
+	$(CC) $(CFLAGS) -o $(PERF_TARGET) $(PERF_SOURCE) -lm
+
 # Clean compiled files
 clean:
-	rm -f $(TARGET) $(TARGET).exe
+	rm -f $(TARGET) $(TARGET).exe $(PERF_TARGET) $(PERF_TARGET).exe *.txt
+
+# Run full performance tests for all cases
+performance: $(PERF_TARGET)
+	@echo "Running comprehensive performance tests..."
+	./run_performance_tests.sh
+
+# Quick performance test with fewer samples
+quick-test: $(PERF_TARGET)
+	@echo "Running quick performance test (10 samples)..."
+	@echo "Case 1:"
+	./$(PERF_TARGET) 1 1000 10000 10
+	@echo ""
+	@echo "Case 2:"
+	./$(PERF_TARGET) 2 1000 10000 10
+	@echo ""
+	@echo "Case 3:"
+	./$(PERF_TARGET) 3 1000 10000 10
 
 # Test with different configurations
 test: $(TARGET)
@@ -41,4 +64,4 @@ test-threads: $(TARGET)
 	@echo "8 threads:"
 	./$(TARGET) 1000 10000 8 0.8 0.1
 
-.PHONY: all clean test test-threads
+.PHONY: all clean test test-threads performance quick-test

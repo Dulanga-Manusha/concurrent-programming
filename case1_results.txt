@@ -1,0 +1,27 @@
+Performance Testing - Case 1
+n = 1000, m = 10000, samples = 50
+Member: 99.0%, Insert: 0.5%, Delete: 0.5%
+
+Implementation	Threads	Average (s)	Std Dev (s)
+===============================================
+Running Serial with 1 thread(s)... 10 20 30 40 50 
+Serial		1	0.007100	0.000382
+Serial		2	-		-
+Serial		4	-		-
+Serial		8	-		-
+Running Mutex with 1 thread(s)... 10 20 30 40 50 
+Mutex		1	0.007889	0.001103
+Running Mutex with 2 thread(s)... 10 20 30 40 50 
+Mutex		2	0.020638	0.002446
+Running Mutex with 4 thread(s)... 10 20 30 40 50 
+Mutex		4	0.023228	0.000800
+Running Mutex with 8 thread(s)... 10 20 30 40 50 
+Mutex		8	0.032595	0.000934
+Running Read-Write Lock with 1 thread(s)... 10 20 30 40 50 
+Read-Write Lock		1	0.007393	0.001030
+Running Read-Write Lock with 2 thread(s)... 10 20 30 40 50 
+Read-Write Lock		2	0.006855	0.000964
+Running Read-Write Lock with 4 thread(s)... 10 20 30 40 50 
+Read-Write Lock		4	0.007716	0.000365
+Running Read-Write Lock with 8 thread(s)... 10 20 30 40 50 
+Read-Write Lock		8	0.008149	0.000539

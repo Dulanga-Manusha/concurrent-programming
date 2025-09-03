@@ -5,6 +5,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <math.h>
 
 // Linked list node structure
 struct list_node_s {
@@ -35,9 +36,10 @@ int Delete_rwlock(int value);
 void* thread_function_serial(void* rank);
 void* thread_function_mutex(void* rank);
 void* thread_function_rwlock(void* rank);
-void print_list(struct list_node_s* head_p);
 void free_list(struct list_node_s** head_pp);
 double get_time_diff(struct timeval start, struct timeval end);
+void populate_list(int n);
+double run_test(int implementation, int threads);
 
 // Serial implementation of Member function
 int Member(int value, struct list_node_s* head_p) {
@@ -159,7 +161,7 @@ void* thread_function_serial(void* rank) {
     int remainder = m % thread_count;
     int my_ops = ops_per_thread + (my_rank < remainder ? 1 : 0);
     
-    unsigned int seed = time(NULL) + my_rank;
+    unsigned int seed = time(NULL) + my_rank + getpid();
     
     for (int i = 0; i < my_ops; i++) {
         double operation = (double) rand_r(&seed) / RAND_MAX;
@@ -184,7 +186,7 @@ void* thread_function_mutex(void* rank) {
     int remainder = m % thread_count;
     int my_ops = ops_per_thread + (my_rank < remainder ? 1 : 0);
     
-    unsigned int seed = time(NULL) + my_rank;
+    unsigned int seed = time(NULL) + my_rank + getpid();
     
     for (int i = 0; i < my_ops; i++) {
         double operation = (double) rand_r(&seed) / RAND_MAX;
@@ -209,7 +211,7 @@ void* thread_function_rwlock(void* rank) {
     int remainder = m % thread_count;
     int my_ops = ops_per_thread + (my_rank < remainder ? 1 : 0);
     
-    unsigned int seed = time(NULL) + my_rank;
+    unsigned int seed = time(NULL) + my_rank + getpid();
     
     for (int i = 0; i < my_ops; i++) {
         double operation = (double) rand_r(&seed) / RAND_MAX;
@@ -225,17 +227,6 @@ void* thread_function_rwlock(void* rank) {
     }
     
     return NULL;
-}
-
-// Utility function to print the list
-void print_list(struct list_node_s* head_p) {
-    struct list_node_s* curr_p = head_p;
-    printf("List: ");
-    while (curr_p != NULL) {
-        printf("%d ", curr_p->data);
-        curr_p = curr_p->next;
-    }
-    printf("\n");
 }
 
 // Utility function to free the list
@@ -258,8 +249,8 @@ double get_time_diff(struct timeval start, struct timeval end) {
 
 // Function to populate the list with n unique random values
 void populate_list(int n) {
-    srand(time(NULL));
     int* values = malloc(n * sizeof(int));
+    unsigned int seed = time(NULL) + getpid();
     
     // Generate n unique random values
     for (int i = 0; i < n; i++) {
@@ -267,7 +258,7 @@ void populate_list(int n) {
         int unique;
         do {
             unique = 1;
-            value = rand() % 65536; // 0 to 2^16 - 1
+            value = rand_r(&seed) % 65536; // 0 to 2^16 - 1
             for (int j = 0; j < i; j++) {
                 if (values[j] == value) {
                     unique = 0;
@@ -286,108 +277,155 @@ void populate_list(int n) {
     free(values);
 }
 
-int main(int argc, char* argv[]) {
-    if (argc != 6) {
-        printf("Usage: %s <n> <m> <thread_count> <m_member> <m_insert>\n", argv[0]);
-        printf("Note: m_delete = 1.0 - m_member - m_insert\n");
-        return 1;
-    }
-    
-    // Parse command line arguments
-    n = atoi(argv[1]);
-    m = atoi(argv[2]);
-    thread_count = atoi(argv[3]);
-    m_member = atof(argv[4]);
-    m_insert = atof(argv[5]);
-    m_delete = 1.0 - m_member - m_insert;
-    
-    if (m_delete < 0) {
-        printf("Error: m_member + m_insert cannot exceed 1.0\n");
-        return 1;
-    }
-    
-    printf("Configuration:\n");
-    printf("Initial elements (n): %d\n", n);
-    printf("Total operations (m): %d\n", m);
-    printf("Number of threads: %d\n", thread_count);
-    printf("Member fraction: %.2f\n", m_member);
-    printf("Insert fraction: %.2f\n", m_insert);
-    printf("Delete fraction: %.2f\n", m_delete);
-    printf("\n");
-    
-    pthread_t* thread_handles = malloc(thread_count * sizeof(pthread_t));
+// Function to run a single test
+double run_test(int implementation, int threads) {
+    pthread_t* thread_handles = malloc(threads * sizeof(pthread_t));
     struct timeval start_time, end_time;
+    thread_count = threads;
     
-    // Test 1: Serial Implementation
-    printf("=== Serial Implementation ===\n");
+    // Initialize the list
     head_p = NULL;
     populate_list(n);
-    printf("Initial list size: %d\n", n);
+    
+    // Initialize synchronization primitives based on implementation
+    if (implementation == 1) { // Mutex
+        pthread_mutex_init(&list_mutex, NULL);
+    } else if (implementation == 2) { // Read-write lock
+        pthread_rwlock_init(&list_rwlock, NULL);
+    }
     
     gettimeofday(&start_time, NULL);
-    for (long thread = 0; thread < 1; thread++) {
-        thread_function_serial((void*)thread);
+    
+    if (implementation == 0) { // Serial
+        thread_function_serial((void*)0);
+    } else if (implementation == 1) { // Mutex
+        for (long thread = 0; thread < threads; thread++) {
+            pthread_create(&thread_handles[thread], NULL, thread_function_mutex, (void*)thread);
+        }
+        for (int thread = 0; thread < threads; thread++) {
+            pthread_join(thread_handles[thread], NULL);
+        }
+    } else if (implementation == 2) { // Read-write lock
+        for (long thread = 0; thread < threads; thread++) {
+            pthread_create(&thread_handles[thread], NULL, thread_function_rwlock, (void*)thread);
+        }
+        for (int thread = 0; thread < threads; thread++) {
+            pthread_join(thread_handles[thread], NULL);
+        }
     }
+    
     gettimeofday(&end_time, NULL);
     
-    double serial_time = get_time_diff(start_time, end_time);
-    printf("Serial execution time: %.6f seconds\n", serial_time);
+    double execution_time = get_time_diff(start_time, end_time);
+    
+    // Clean up
+    if (implementation == 1) {
+        pthread_mutex_destroy(&list_mutex);
+    } else if (implementation == 2) {
+        pthread_rwlock_destroy(&list_rwlock);
+    }
+    
     free_list(&head_p);
-    printf("\n");
-    
-    // Test 2: Mutex Implementation
-    printf("=== Mutex Implementation ===\n");
-    head_p = NULL;
-    populate_list(n);
-    pthread_mutex_init(&list_mutex, NULL);
-    printf("Initial list size: %d\n", n);
-    
-    gettimeofday(&start_time, NULL);
-    for (long thread = 0; thread < thread_count; thread++) {
-        pthread_create(&thread_handles[thread], NULL, thread_function_mutex, (void*)thread);
-    }
-    for (int thread = 0; thread < thread_count; thread++) {
-        pthread_join(thread_handles[thread], NULL);
-    }
-    gettimeofday(&end_time, NULL);
-    
-    double mutex_time = get_time_diff(start_time, end_time);
-    printf("Mutex execution time: %.6f seconds\n", mutex_time);
-    printf("Speedup over serial: %.2fx\n", serial_time / mutex_time);
-    pthread_mutex_destroy(&list_mutex);
-    free_list(&head_p);
-    printf("\n");
-    
-    // Test 3: Read-Write Lock Implementation
-    printf("=== Read-Write Lock Implementation ===\n");
-    head_p = NULL;
-    populate_list(n);
-    pthread_rwlock_init(&list_rwlock, NULL);
-    printf("Initial list size: %d\n", n);
-    
-    gettimeofday(&start_time, NULL);
-    for (long thread = 0; thread < thread_count; thread++) {
-        pthread_create(&thread_handles[thread], NULL, thread_function_rwlock, (void*)thread);
-    }
-    for (int thread = 0; thread < thread_count; thread++) {
-        pthread_join(thread_handles[thread], NULL);
-    }
-    gettimeofday(&end_time, NULL);
-    
-    double rwlock_time = get_time_diff(start_time, end_time);
-    printf("Read-write lock execution time: %.6f seconds\n", rwlock_time);
-    printf("Speedup over serial: %.2fx\n", serial_time / rwlock_time);
-    printf("Speedup over mutex: %.2fx\n", mutex_time / rwlock_time);
-    pthread_rwlock_destroy(&list_rwlock);
-    free_list(&head_p);
-    printf("\n");
-    
-    // Performance Summary
-    printf("=== Performance Summary ===\n");
-    printf("Serial time:     %.6f seconds\n", serial_time);
-    printf("Mutex time:      %.6f seconds (%.2fx speedup)\n", mutex_time, serial_time / mutex_time);
-    printf("RW-Lock time:    %.6f seconds (%.2fx speedup)\n", rwlock_time, serial_time / rwlock_time);
-    
     free(thread_handles);
+    
+    return execution_time;
+}
+
+// Function to calculate statistics
+void calculate_stats(double* times, int samples, double* mean, double* std_dev) {
+    *mean = 0.0;
+    for (int i = 0; i < samples; i++) {
+        *mean += times[i];
+    }
+    *mean /= samples;
+    
+    double variance = 0.0;
+    for (int i = 0; i < samples; i++) {
+        variance += (times[i] - *mean) * (times[i] - *mean);
+    }
+    variance /= (samples - 1);
+    *std_dev = sqrt(variance);
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 5) {
+        printf("Usage: %s <case_number> <n> <m> <samples>\n", argv[0]);
+        printf("case_number: 1, 2, or 3\n");
+        printf("n: initial elements\n");
+        printf("m: total operations\n");
+        printf("samples: number of test runs\n");
+        return 1;
+    }
+    
+    int case_number = atoi(argv[1]);
+    n = atoi(argv[2]);
+    m = atoi(argv[3]);
+    int samples = atoi(argv[4]);
+    
+    // Set fractions based on case number
+    switch (case_number) {
+        case 1:
+            m_member = 0.99;
+            m_insert = 0.005;
+            m_delete = 0.005;
+            break;
+        case 2:
+            m_member = 0.90;
+            m_insert = 0.05;
+            m_delete = 0.05;
+            break;
+        case 3:
+            m_member = 0.50;
+            m_insert = 0.25;
+            m_delete = 0.25;
+            break;
+        default:
+            printf("Invalid case number. Use 1, 2, or 3.\n");
+            return 1;
+    }
+    
+    printf("Performance Testing - Case %d\n", case_number);
+    printf("n = %d, m = %d, samples = %d\n", n, m, samples);
+    printf("Member: %.1f%%, Insert: %.1f%%, Delete: %.1f%%\n\n", 
+           m_member * 100, m_insert * 100, m_delete * 100);
+    
+    int thread_counts[] = {1, 2, 4, 8};
+    char* impl_names[] = {"Serial", "Mutex", "Read-Write Lock"};
+    
+    printf("Implementation\tThreads\tAverage (s)\tStd Dev (s)\n");
+    printf("===============================================\n");
+    
+    for (int impl = 0; impl < 3; impl++) {
+        for (int t_idx = 0; t_idx < 4; t_idx++) {
+            int threads = thread_counts[t_idx];
+            
+            // For serial implementation, only use 1 thread
+            if (impl == 0 && threads > 1) {
+                printf("%s\t\t%d\t-\t\t-\n", impl_names[impl], threads);
+                continue;
+            }
+            
+            double* times = malloc(samples * sizeof(double));
+            
+            printf("Running %s with %d thread(s)... ", impl_names[impl], threads);
+            fflush(stdout);
+            
+            for (int i = 0; i < samples; i++) {
+                times[i] = run_test(impl, threads);
+                if ((i + 1) % 10 == 0) {
+                    printf("%d ", i + 1);
+                    fflush(stdout);
+                }
+            }
+            
+            double mean, std_dev;
+            calculate_stats(times, samples, &mean, &std_dev);
+            
+            printf("\n%s\t\t%d\t%.6f\t%.6f\n", impl_names[impl], threads, mean, std_dev);
+            
+            free(times);
+        }
+    }
+    
     return 0;
 }
